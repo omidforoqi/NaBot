@@ -7,7 +7,7 @@ from psycopg2 import OperationalError
 class Monitoring:
     def __init__(self, db_name, db_user, db_password, db_host, db_port) -> None:
         super(Monitoring, self).__init__()
-        # Connect to the MySQL server
+        # Connect to the postgresql server
         try:
             self.db = psycopg2.connect(
                 database=db_name,
