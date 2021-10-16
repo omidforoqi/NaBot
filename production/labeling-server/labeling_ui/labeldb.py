@@ -39,31 +39,39 @@ class Labeling:
         return login_successfully
 
     def give_record(self, username: str):
-        article_query = "select articles.article \
-from articles, summarization as summ \
-where not articles.highlights=summ.summary and not summ.user_name=%s"
-
-        highlights_query = "select articles.highlights \
-from articles, summarization as summ \
-where not articles.highlights=summ.summary and not summ.user_name=%s"
+        articles_id_query = "select id from articles"
+        articles_user_seen_query = "select article_id from summarization where user_name=%s"
+        article_return_query = "select article from articles where id=%s"
+        summary_return_query = "select highlights from articles where id=%s"
+        article, highlights, article_id = "", "", ""
         try:
             cursor = self.db.cursor()
-            cursor.execute(article_query, (username,))
-            article = cursor.fetchone()
-            cursor.execute(highlights_query, (username,))
-            highlights = cursor.fetchone()
-            article = next(iter(article)) if article else ""
-            highlights = next(iter(highlights)) if article else ""
 
-            return article, highlights
+            cursor.execute(articles_id_query)
+            articles_id = cursor.fetchall()
+            articles_id = set([item[0] for item in articles_id])
+            cursor.execute(articles_user_seen_query, (username,))
+            user_seen_article_id = cursor.fetchall()
+            user_seen_article_id = set([item[0] for item in user_seen_article_id])
+            article_id = tuple(articles_id.difference(user_seen_article_id))
+            if len(article_id) > 0:
+                article_id = article_id[0]
+                cursor.execute(article_return_query, (article_id,))
+                article = cursor.fetchone()
+                article = next(iter(article)) if article else ""
+                cursor.execute(summary_return_query, (article_id,))
+                highlights = cursor.fetchone()
+                highlights = next(iter(highlights)) if article else ""            
         finally:
             cursor.close()
+        return article, highlights, article_id
 
-    def write_record(self, username: str, summary: str, feedback: bool, user_summary: Union[str, None]):
-        query = "insert into summarization (user_name, summary, feedback, user_summary) \
+    def write_record(self, username: str, feedback: bool, user_summary: Union[str, None], article_id: str):
+        query = "insert into summarization (user_name, feedback, user_summary, article_id) \
 VALUES(%s, %s, %s, %s)"
         try:
             cursor = self.db.cursor()
-            cursor.execute(query, (username, summary, feedback, user_summary))
+            cursor.execute(query, (username, feedback, user_summary, article_id))
+            self.db.commit()
         finally:
             cursor.close()
